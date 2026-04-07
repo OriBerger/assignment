@@ -37,3 +37,6 @@ coverage/
 
 # Docker/runtime artifacts
 backend/models/
+
+# Large media artifacts
+public/placeholder.mp4
