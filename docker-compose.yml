@@ -1,0 +1,11 @@
+services:
+  jetson-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jetson-yolo-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - BACKEND_URL=http://127.0.0.1:8000
+    mem_limit: 1g

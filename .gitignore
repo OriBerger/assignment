@@ -1,0 +1,39 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.venv/
+venv/
+env/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Build/test caches
+.cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage/
+
+# Docker/runtime artifacts
+backend/models/
