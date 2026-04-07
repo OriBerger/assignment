@@ -211,7 +211,7 @@ export default function HomePage() {
 
         setHistory((prev) => {
           const combined = [...prev, ...incoming];
-          return combined.slice(-120);
+          return combined.slice(-250);
         });
         setHistoryMap((prev) => {
           const next = { ...prev };
@@ -219,7 +219,7 @@ export default function HomePage() {
             next[item.frameId] = item;
           });
           const ids = Object.keys(next).map(Number).sort((a, b) => a - b);
-          while (ids.length > 120) {
+          while (ids.length > 250) {
             const first = ids.shift();
             delete next[first];
           }
