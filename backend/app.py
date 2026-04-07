@@ -9,7 +9,6 @@ worker = DetectionQueueWorker(max_queue_size=32, max_history=250)
 
 
 class EnqueueFrameRequest(BaseModel):
-    frameId: int
     imageData: str
     timestamp: int
 
@@ -31,12 +30,18 @@ def health():
 
 @app.post("/enqueue")
 def enqueue_frame(body: EnqueueFrameRequest):
-    accepted = worker.enqueue(body.model_dump())
-    if not accepted:
+    frame_id = worker.enqueue(body.model_dump())
+    if frame_id is None:
         raise HTTPException(status_code=429, detail="Frame queue is full")
-    return {"accepted": True, "frameId": body.frameId}
+    return {"accepted": True, "frameId": frame_id}
 
 
 @app.get("/results")
 def get_results(afterId: int = 0):
     return {"results": worker.get_results_after(afterId)}
+
+
+@app.post("/session/clear")
+def clear_session():
+    worker.clear_session()
+    return {"cleared": True}

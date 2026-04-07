@@ -1,6 +1,6 @@
 from collections import OrderedDict
-from queue import Full, Queue
-from threading import Event, Thread
+from queue import Empty, Full, Queue
+from threading import Event, Lock, Thread
 from time import time
 
 import cv2
@@ -14,8 +14,11 @@ class DetectionQueueWorker:
         self.results = OrderedDict()
         self.max_history = max_history
         self.stop_event = Event()
+        self.state_lock = Lock()
         self.detector = None
         self.detector_error = None
+        self.next_frame_id = 1
+        self.enqueue_lock = Lock()
         self.thread = Thread(target=self._run, daemon=True)
 
     def start(self) -> None:
@@ -26,15 +29,34 @@ class DetectionQueueWorker:
         if self.thread.is_alive():
             self.thread.join(timeout=1.0)
 
-    def enqueue(self, payload: dict) -> bool:
-        try:
-            self.queue.put_nowait(payload)
-            return True
-        except Full:
-            return False
+    def enqueue(self, payload: dict) -> int | None:
+        with self.enqueue_lock:
+            if self.queue.full():
+                return None
+            frame_id = self.next_frame_id
+            self.next_frame_id += 1
+            queued = {**payload, "frameId": frame_id}
+            try:
+                self.queue.put_nowait(queued)
+                return frame_id
+            except Full:
+                return None
 
     def get_results_after(self, after_id: int) -> list[dict]:
-        return [value for key, value in self.results.items() if key > after_id]
+        with self.state_lock:
+            return [value for key, value in self.results.items() if key > after_id]
+
+    def clear_session(self) -> None:
+        with self.enqueue_lock:
+            while True:
+                try:
+                    self.queue.get_nowait()
+                    self.queue.task_done()
+                except Empty:
+                    break
+            with self.state_lock:
+                self.results.clear()
+                self.next_frame_id = 1
 
     def _run(self) -> None:
         while not self.stop_event.is_set():
@@ -65,9 +87,10 @@ class DetectionQueueWorker:
                 "imageData": image_data,
                 "error": error,
             }
-            self.results[frame_id] = result
-            while len(self.results) > self.max_history:
-                self.results.popitem(last=False)
+            with self.state_lock:
+                self.results[frame_id] = result
+                while len(self.results) > self.max_history:
+                    self.results.popitem(last=False)
             self.queue.task_done()
 
     @staticmethod
