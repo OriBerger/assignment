@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const LIVE_INTERVALS = [500, 750, 1000, 1500, 2000];
+const LIVE_INTERVALS = [350, 500, 750, 1000, 1500, 2000];
 
 function cloneDetections(detections) {
   return detections.map((d) => ({ ...d }));
@@ -84,7 +84,6 @@ export default function HomePage() {
   const captureCanvasRef = useRef(null);
   const captureInFlightRef = useRef(false);
   const pollInFlightRef = useRef(false);
-  const nextFrameIdRef = useRef(1);
   const [liveEnabled, setLiveEnabled] = useState(false);
   const [liveIntervalMs, setLiveIntervalMs] = useState(1000);
   const [lastFetchedId, setLastFetchedId] = useState(0);
@@ -156,19 +155,19 @@ export default function HomePage() {
       ctx.drawImage(video, 0, 0, width, height);
 
       const imageData = captureCanvas.toDataURL("image/jpeg", 0.72);
-      const frameId = nextFrameIdRef.current;
-      nextFrameIdRef.current += 1;
       const response = await fetch("/api/enqueue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          frameId,
           imageData,
           timestamp: Date.now()
         })
       });
       if (response.ok) {
-        setPendingFrameIds((prev) => [...prev, frameId]);
+        const data = await response.json();
+        if (typeof data.frameId === "number") {
+          setPendingFrameIds((prev) => [...prev, data.frameId]);
+        }
       } else if (response.status === 429) {
         setCurrentStatus("Queue is full. Increase interval or wait for processing.");
       }
@@ -186,6 +185,43 @@ export default function HomePage() {
     }, liveIntervalMs);
     return () => clearInterval(interval);
   }, [liveEnabled, liveIntervalMs, pendingFrameIds.length]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    const fetchInitialHistory = async () => {
+      try {
+        const response = await fetch("/api/results?afterId=0", { cache: "no-store" });
+        if (!response.ok || canceled) {
+          return;
+        }
+        const data = await response.json();
+        const incoming = (data.results || []).sort((a, b) => a.frameId - b.frameId);
+        if (!incoming.length || canceled) {
+          return;
+        }
+
+        const recent = incoming.slice(-250);
+        const nextMap = {};
+        recent.forEach((item) => {
+          nextMap[item.frameId] = item;
+        });
+
+        setHistory(recent);
+        setHistoryMap(nextMap);
+        setSelectedFrameId(recent[recent.length - 1].frameId);
+        setLastFetchedId(recent[recent.length - 1].frameId);
+      } catch {
+        // Ignore bootstrap errors and rely on regular polling.
+      }
+    };
+
+    fetchInitialHistory();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!liveEnabled && pendingFrameIds.length === 0) {
@@ -265,6 +301,27 @@ export default function HomePage() {
     setCurrentOverlay([]);
   };
 
+  const clearSession = async () => {
+    if (liveEnabled) {
+      return;
+    }
+    const response = await fetch("/api/session/clear", {
+      method: "POST",
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      setCurrentStatus("Unable to clear session history.");
+      return;
+    }
+    setPendingFrameIds([]);
+    setHistory([]);
+    setHistoryMap({});
+    setSelectedFrameId(null);
+    setCurrentOverlay([]);
+    setLastFetchedId(0);
+    setCurrentStatus("Session cleared. Ready for new analysis.");
+  };
+
   return (
     <main className="dashboard">
       <section className="topRow">
@@ -289,6 +346,9 @@ export default function HomePage() {
             </button>
             <button onClick={clearOverlay} disabled={liveEnabled}>
               Clear Overlay
+            </button>
+            <button onClick={clearSession} disabled={liveEnabled}>
+              Clear Session
             </button>
           </div>
           <div className="statusText">{currentStatus}</div>
