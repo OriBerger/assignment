@@ -5,7 +5,7 @@ from backend.queue_worker import DetectionQueueWorker
 
 
 app = FastAPI(title="Jetson YOLO Backend")
-worker = DetectionQueueWorker(max_queue_size=32, max_history=120)
+worker = DetectionQueueWorker(max_queue_size=32, max_history=250)
 
 
 class EnqueueFrameRequest(BaseModel):
