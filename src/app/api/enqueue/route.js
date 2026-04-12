@@ -1,5 +1,8 @@
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
+/**
+ * Proxies enqueue requests from the browser to the FastAPI POST /enqueue endpoint (same JSON body and status).
+ */
 export async function POST(request) {
   const body = await request.json();
   const response = await fetch(`${BACKEND_URL}/enqueue`, {
