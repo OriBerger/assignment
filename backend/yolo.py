@@ -12,6 +12,7 @@ LABELS_PATH = MODELS_DIR / "coco.names"
 
 
 def ensure_model_files() -> None:
+    """Ensure the models directory exists and cfg/weights files are present, or raise with a clear error."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     missing = []
     if not CFG_PATH.exists():
@@ -27,6 +28,7 @@ def ensure_model_files() -> None:
 
 
 def decode_image_from_base64(data_url: str) -> np.ndarray:
+    """Decode a data-URL style base64 string into a BGR OpenCV image array."""
     payload = data_url.split(",", 1)[-1]
     image_bytes = base64.b64decode(payload)
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -50,6 +52,7 @@ class TinyYoloDetector:
         self.nms_threshold = nms_threshold
 
     def detect(self, frame: np.ndarray) -> list[dict]:
+        """Run inference on a BGR frame and return normalized boxes with COCO label names and scores."""
         h, w = frame.shape[:2]
         blob = cv2.dnn.blobFromImage(
             frame,

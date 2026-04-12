@@ -1,5 +1,8 @@
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
+/**
+ * Proxies polling for new detection results to FastAPI GET /results, forwarding the afterId query parameter.
+ */
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const afterId = searchParams.get("afterId") || "0";
