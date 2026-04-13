@@ -7,7 +7,7 @@ const LIVE_INTERVALS = [350, 500, 750, 1000, 1500, 2000];
 const COCO_PERSON_LABEL = "person";
 /** Long-edge cap for captured frames; lower = smaller payloads and less UI lag. Matches backend `MAX_FRAME_EDGE`. */
 const CAPTURE_MAX_EDGE_PX = 480;
-const CAPTURE_JPEG_QUALITY = 0.62;
+const CAPTURE_JPEG_QUALITY = 0.65;
 const MEMORY_CHART_WIDTH = 130;
 const MEMORY_CHART_HEIGHT = 38;
 const MEMORY_CHART_MAX_MB = 1024;
@@ -257,6 +257,12 @@ export default function HomePage() {
   );
   const canGoPrev = selectedFrameIndex > 0;
   const canGoNext = selectedFrameIndex >= 0 && selectedFrameIndex < sortedHistory.length - 1;
+  const canGoPrevPerson =
+    personHistory.length > 0 &&
+    (selectedFrameId == null || personHistory.some((item) => item.frameId < selectedFrameId));
+  const canGoNextPerson =
+    personHistory.length > 0 &&
+    (selectedFrameId == null || personHistory.some((item) => item.frameId > selectedFrameId));
 
   // Sizes the video overlay canvas to the video element and redraws the latest detection boxes.
   const resizeOverlay = () => {
@@ -486,6 +492,28 @@ export default function HomePage() {
     setSelectedFrameId(sortedHistory[nextIdx].frameId);
   };
 
+  // Jumps to previous/next frame containing a detected person (independent from regular gallery navigation).
+  const moveSelectedPerson = (direction) => {
+    if (!personHistory.length) {
+      return;
+    }
+    if (selectedFrameId == null) {
+      setSelectedFrameId(
+        direction < 0
+          ? personHistory[personHistory.length - 1].frameId
+          : personHistory[0].frameId
+      );
+      return;
+    }
+    const target =
+      direction < 0
+        ? [...personHistory].reverse().find((item) => item.frameId < selectedFrameId)
+        : personHistory.find((item) => item.frameId > selectedFrameId);
+    if (target) {
+      setSelectedFrameId(target.frameId);
+    }
+  };
+
   // Clears detection boxes on the video overlay in manual mode (disabled while live analysis runs).
   const clearOverlay = () => {
     if (liveEnabled) {
@@ -662,24 +690,36 @@ export default function HomePage() {
               Next
             </button>
           </div>
+          <div className="controls">
+            <button onClick={() => moveSelectedPerson(-1)} disabled={!canGoPrevPerson}>
+              Prev person
+            </button>
+            <button onClick={() => moveSelectedPerson(1)} disabled={!canGoNextPerson}>
+              Next person
+            </button>
+          </div>
         </article>
       </section>
 
       <section className="galleryCard" aria-labelledby="all-frames-title">
         <h3 className="sectionTitle" id="all-frames-title">
-          Frames history
+          Gallery
         </h3>
-        <div className="thumbRow">
-          {sortedHistory.map((frame) => (
-            <FrameGalleryThumb
-              key={frame.frameId}
-              frame={frame}
-              selected={selectedFrameId === frame.frameId}
-              onSelect={setSelectedFrameId}
-              lazyImage={false}
-            />
-          ))}
-        </div>
+        {sortedHistory.length === 0 ? (
+          <p className="statusText galleryEmptyHint">No frames in gallery yet.</p>
+        ) : (
+          <div className="thumbRow">
+            {sortedHistory.map((frame) => (
+              <FrameGalleryThumb
+                key={frame.frameId}
+                frame={frame}
+                selected={selectedFrameId === frame.frameId}
+                onSelect={setSelectedFrameId}
+                lazyImage={false}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="galleryCard" aria-labelledby="person-frames-title">
