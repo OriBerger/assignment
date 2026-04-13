@@ -4,6 +4,7 @@ from threading import Event, Lock, Thread
 from time import time
 
 import cv2
+import numpy as np
 
 from backend.yolo import TinyYoloDetector, decode_image_from_base64
 
@@ -30,6 +31,18 @@ class DetectionQueueWorker:
     def start(self) -> None:
         """Start the worker thread that processes queued frames."""
         self.thread.start()
+
+    def preload_detector(self) -> None:
+        """Load YOLO and run one tiny warmup inference before first user capture."""
+        if self.detector is not None or self.detector_error is not None:
+            return
+        try:
+            self.detector = TinyYoloDetector()
+            # Warm up the first forward pass so initial live/capture action feels immediate.
+            warmup_frame = np.zeros((MAX_FRAME_EDGE, MAX_FRAME_EDGE, 3), dtype=np.uint8)
+            self.detector.detect(warmup_frame)
+        except Exception as exc:
+            self.detector_error = str(exc)
 
     def stop(self) -> None:
         """Ask the worker loop to exit and join the thread with a short timeout."""
@@ -85,9 +98,11 @@ class DetectionQueueWorker:
             error = None
             try:
                 if self.detector is None and self.detector_error is None:
-                    self.detector = TinyYoloDetector()
+                    self.preload_detector()
                 if self.detector is not None:
                     detections = self.detector.detect(frame)
+                elif self.detector_error is not None:
+                    error = self.detector_error
             except Exception as exc:
                 self.detector_error = str(exc)
                 error = self.detector_error
