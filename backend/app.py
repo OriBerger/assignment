@@ -90,7 +90,8 @@ class EnqueueFrameRequest(BaseModel):
 
 @app.on_event("startup")
 def on_startup():
-    """Start the background detection worker thread when the API process starts."""
+    """Preload YOLO and start the background detection worker thread."""
+    worker.preload_detector()
     worker.start()
 
 
